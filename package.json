@@ -1,0 +1,30 @@
+{
+  "name": "rsa-mkcoding",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "^2.1.0",
+    "animate.css": "^4.1.1",
+    "ant-design-vue": "^4.0.2",
+    "axios": "^1.4.0",
+    "clipboard": "^2.0.11",
+    "echarts": "^5.4.3",
+    "element-plus": "^2.3.9",
+    "jquery": "^3.7.1",
+    "mitt": "^3.0.1",
+    "pinia": "^2.1.6",
+    "pinia-plugin-persistedstate": "^3.2.0",
+    "vue": "^3.3.4",
+    "vue-router": "^4.2.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^4.2.3",
+    "naive-ui": "^2.34.4",
+    "vite": "^4.4.6"
+  }
+}
