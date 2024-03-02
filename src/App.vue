@@ -26,20 +26,17 @@ h1 {
   margin: 0;
   padding: 0;
 }
-.fade-right-enter-to,
-.fade-right-leave-from{
+.fade-right-enter-to{
   opacity: 1;
   transform: none;
 }
  
-.fade-right-enter-active,
-.fade-right-leave-active
+.fade-right-enter-active
 {
-  transition: all 0.25s;
+  transition: all 0.5s;
 }
  
-.fade-right-enter-from,
-.fade-right-leave-to{
+.fade-right-enter-from{
   opacity: 0;
   transform: translateX(20px);
 }

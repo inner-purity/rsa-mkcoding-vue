@@ -1,10 +1,21 @@
 <script setup>
 import { computed, ref } from "vue";
-import axios from "axios";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElNotification } from "element-plus";
 import { useTipsVisibleStore } from "../../stores/tipsVisible";
 import { useIsTypecodingStore } from "../../stores/isTypeCoding";
-import { NCard, NModal, NTooltip, NInputNumber } from "naive-ui";
+import {
+  NCard,
+  NModal,
+  NTooltip,
+  NInputNumber,
+  NButton,
+  NSkeleton,
+} from "naive-ui";
+////////////////////////////////////////////////////////////////////////////////////////////
+import axios from "axios";
+import instance from "../../axios/axios";
+////////////////////////////////////////////////////////////////////////////////////////////
+import responseDataMessage from "../../hooks/reponseDataMessage";
 ////////////////////////////////////////////////////////////////
 const useTipsVisible = useTipsVisibleStore();
 const useIsTypecoding = useIsTypecodingStore();
@@ -89,6 +100,7 @@ const remake = () => {
   privatePercentageShow.value = true;
   publicPercentageShow.value = true;
   canStorageFlag.value = true;
+  showQrCodeContent.value = 0;
 };
 const restart = () => {
   publicKeyCodeLoding.value = true;
@@ -188,9 +200,15 @@ const httpRequestKeyCode = async () => {
       options = "twoRsa";
     // console.log(options);
     await axios
-      .get(`https://infinitypoint.top:2333/${options}`, {
-        cancelToken: cancelToken.token,
-      })
+      .get(
+        `https://infinitypoint.top:2333/${options}` +
+          `?mima=${
+            privateKeyPassword.value === "" ? "0" : privateKeyPassword.value
+          }`,
+        {
+          cancelToken: cancelToken.token,
+        }
+      )
       .then((response) => {
         publicKeyCodeLoding.value = false;
         privateKeyCodeLoding.value = false;
@@ -337,24 +355,9 @@ const cannotStorageMessage = () => {
     center: true,
     type: "warning",
   });
-};
-const storageSuccessMessage = () => {
-  ElMessage({
-    message: "保存成功!",
-    grouping: true,
-    center: true,
-    type: "success",
-  });
-};
+}
 const storageSettingForm = ref({
-  storeTime: "",
-  keyType: "",
-  keyForce: "",
   isUserPrivatePasswordStore: "false",
-  note: "",
-  privatePassword: "",
-  privateKeyCodeStore: "",
-  publicKeyCodeStore: "",
 });
 const storageSettingFormList = ref([]);
 const storageButtonHandle = () => {
@@ -362,31 +365,85 @@ const storageButtonHandle = () => {
     cannotStorageMessage();
   } else {
     historyStorageTableShow.value = true;
-    storageSettingForm.value.storeTime = dateToStr();
-    storageSettingForm.value.keyType = keyForm.value.form;
-    storageSettingForm.value.keyForce = keyForceData.value.data;
-    storageSettingForm.value.privateKeyCodeStore = privateInitKeyCopy.value;
-    storageSettingForm.value.publicKeyCodeStore = publicInitKeyCopy.value;
+    axiosStorageSettingForm.value.storeTime = dateToStr();
+    axiosStorageSettingForm.value.keyType = keyForm.value.form;
+    axiosStorageSettingForm.value.keyForce = keyForceData.value.data;
+    axiosStorageSettingForm.value.privateKey = privateInitKeyCopy.value;
+    axiosStorageSettingForm.value.publicKey = publicInitKeyCopy.value;
   }
 };
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+const axiosStorageSettingForm = ref({
+  id: null,
+  userId: null,
+  storeTime: "",
+  keyType: "",
+  keyForce: "",
+  note: "",
+  privateKey: "",
+  publicKey: "",
+  privatePassword: "",
+});
 const historyStorageHandle = () => {
-  historyStorageTableShow.value = false;
-  if (localStorage.getItem("keyHistoryStorage")) {
-    storageSettingFormList.value = JSON.parse(
-      localStorage.getItem("keyHistoryStorage")
-    );
-  }
   if (storageSettingForm.value.isUserPrivatePasswordStore === true) {
-    storageSettingForm.value.privatePassword = privateKeyPassword.value;
+    axiosStorageSettingForm.value.privatePassword = privateKeyPassword.value;
   }
-  storageSettingFormList.value.push({ ...storageSettingForm.value });
-  localStorage.setItem(
-    "keyHistoryStorage",
-    JSON.stringify(storageSettingFormList.value)
-  );
-  storageSuccessMessage();
-  canStorageFlag.value = false;
+  try {
+    const formData1 = new FormData();
+    formData1.append("text", axiosStorageSettingForm.value.privateKey);
+    instance
+      .post("/users/common/uploadText", formData1, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      })
+      .then((res) => {
+        const responseData = res.data;
+        if (responseData.code === 0) {
+          Promise.reject();
+        }
+        axiosStorageSettingForm.value.privateKey = responseData.data;
+
+        const formData2 = new FormData();
+        formData2.append("text", axiosStorageSettingForm.value.publicKey);
+        instance
+          .post("/users/common/uploadText", formData2, {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
+          })
+          .then((res) => {
+            const responseData = res.data;
+            if (responseData.code === 0) {
+              Promise.reject();
+            }
+            axiosStorageSettingForm.value.publicKey = responseData.data;
+
+            axiosStorageSettingForm.value.storeTime = "";
+            instance
+              .post("/users/rsaKey/upload", axiosStorageSettingForm.value)
+              .then((res) => {
+                const responseData = res.data;
+                responseDataMessage(
+                  responseData,
+                  "点击'查看账户数据'查看已保存的数据记录"
+                );
+                if (responseData.code === 1) {
+                  canStorageFlag.value = false;
+                  historyStorageTableShow.value = false;
+                }
+              });
+          });
+      });
+  } catch (error) {
+    console.log(error);
+    ElNotification({
+      title: `${error.message}`,
+      type: "error",
+    });
+  }
 };
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //日期转字符串格式
 const dateToStr = () => {
   let date = new Date();
@@ -425,7 +482,7 @@ const downloadKeyCodeHandle = () => {
       "\n",
       `***${dateToStr()} RSA-mkCoding 网 生成***`,
       "\n\n",
-      "相关贡献者(GitHub用户名)：前端页面,框架: inner-purity   后端算法实现: brokenstring314",
+      "相关贡献者(GitHub用户名)：inner-purity, brokenstring314",
     ],
     {
       type: "text/plain",
@@ -441,23 +498,8 @@ const downloadKeyCodeHandle = () => {
 const codingMakeGuideActiveName = ref("1");
 ////////////////////////////////////////////////////////////////
 const qrcodeShow = ref(false);
-const PublicQrcodeCanvasRef = ref(null);
-const PrivateQrcodeCanvasRef = ref(null);
-const qrCodeSize = ref(350);
-const qrCodeMake = computed(() => {
-  if (keyForceData.value.data !== "2048") {
-    return false;
-  } else {
-    return true;
-  }
-});
-const qrCodeMakeTemplete = computed(() => {
-  if (keyForceData.value.data !== "2048") {
-    return "点此查看对应二维码，手机扫码立得密钥！";
-  } else {
-    return "2048及以上强度的密钥过长无法生成二维码哦~敬请谅解!";
-  }
-});
+const qrcodeCanvasRef = ref(null);
+const qrCodeSize = ref(250);
 const dowloadChange = async (refModel, string) => {
   const url = await refModel.toDataURL();
   const a = document.createElement("a");
@@ -467,6 +509,84 @@ const dowloadChange = async (refModel, string) => {
   a.click();
   document.body.removeChild(a);
   downLoadSuccessMessage();
+};
+////////////////////////////////////////////////////////////////
+const qrCodeParams = ref({
+  keyType: null,
+  keyForce: null,
+  publicKey: null,
+  privateKey: null,
+  password: null,
+});
+const qrCodeOptions = ref({
+  publicKey: false,
+  privateKey: false,
+  password: false,
+});
+const qrCodeValue = ref("");
+const currentUnicode = ref("");
+const showQrCodeContent = ref(0);
+const qrCodeStatus = ref("loading");
+const cangetQrCode = ref(true);
+const getQrCode = () => {
+  if (cangetQrCode.value === true) {
+    if (
+      qrCodeOptions.value.password === false &&
+      qrCodeOptions.value.privateKey === false &&
+      qrCodeOptions.value.publicKey === false
+    ) {
+      ElNotification({
+        title: "请选择至少一项要携带的数据",
+        type: "info",
+      });
+    } else {
+      qrCodeParams.value.publicKey = null;
+      qrCodeParams.value.privateKey = null;
+      qrCodeParams.value.password = null;
+      cangetQrCode.value = false;
+      showQrCodeContent.value = 1;
+      qrCodeStatus.value = "loading";
+      if (qrCodeOptions.value.publicKey === true) {
+        qrCodeParams.value.publicKey = publicInitKeyCopy.value;
+      }
+      if (qrCodeOptions.value.privateKey === true) {
+        qrCodeParams.value.privateKey = privateInitKeyCopy.value;
+      }
+      if (qrCodeOptions.value.password === true) {
+        qrCodeParams.value.password = privateKeyPassword.value;
+      }
+      qrCodeParams.value.keyType = keyForm.value.form;
+      qrCodeParams.value.keyForce = keyForceData.value.data;
+      setTimeout(() => {
+        instance
+          .post("/users/common/getUnicode", qrCodeParams.value)
+          .then(
+            (res) => {
+              const responseData = res.data;
+              currentUnicode.value = responseData.data;
+              qrCodeValue.value =
+                "http://localhost:2599/users/common/getQrData/" +
+                currentUnicode.value;
+                //此处前缀为本地地址，但app端会截取后半部分有效接口路径，并拼接成真实服务器端接口路径。
+              qrCodeStatus.value = "active";
+              cangetQrCode.value = true;
+            },
+            (rej) => {
+              console.log(rej);
+              cangetQrCode.value = true;
+            }
+          )
+          .catch((error) => {
+            console.log(error);
+            cangetQrCode.value = true;
+            ElNotification({
+              title: `${error.message}`,
+              type: "error",
+            });
+          });
+      }, 650);
+    }
+  }
 };
 ////////////////////////////////////////////////////////////////
 </script>
@@ -482,7 +602,7 @@ const dowloadChange = async (refModel, string) => {
     :show-close="false"
   >
     <el-form
-      :model="storageSettingForm"
+      :model="axiosStorageSettingForm"
       :label-position="left"
       size="default"
       label-width="auto"
@@ -491,21 +611,21 @@ const dowloadChange = async (refModel, string) => {
         ><input
           class="el-from-item-input"
           type="text"
-          v-model="storageSettingForm.storeTime"
+          v-model="axiosStorageSettingForm.storeTime"
           disabled
       /></el-form-item>
       <el-form-item label="密钥类型"
         ><input
           type="text"
           class="el-from-item-input"
-          v-model="storageSettingForm.keyType"
+          v-model="axiosStorageSettingForm.keyType"
           disabled
       /></el-form-item>
       <el-form-item label="密钥强度"
         ><input
           type="text"
           class="el-from-item-input"
-          v-model="storageSettingForm.keyForce"
+          v-model="axiosStorageSettingForm.keyForce"
           disabled
       /></el-form-item>
       <el-form-item label="是否记录密钥密码">
@@ -519,11 +639,12 @@ const dowloadChange = async (refModel, string) => {
       </el-form-item>
       <el-form-item label="备注">
         <el-input
-          v-model="storageSettingForm.note"
+          v-model="axiosStorageSettingForm.note"
           autosize
           resize="none"
           type="textarea"
           style="width: 60%"
+          maxlength="80"
         />
       </el-form-item>
     </el-form>
@@ -547,7 +668,7 @@ const dowloadChange = async (refModel, string) => {
   >
     <el-step title="选择密钥类型" description="(*必选)" />
     <el-step title="选择密钥强度" description="(*必选，影响密码生成)" />
-    <el-step title="私钥密码" description="(可选，无特殊情况建议不设置)" />
+    <el-step title="私钥密码" description="(可选，相当于提供额外防护)" />
     <el-step title="生成密钥" description="生成您的专属密钥!" />
   </el-steps>
   <!-- ///////////////////////////////////////////////////////////////////////////////////////// -->
@@ -573,7 +694,7 @@ const dowloadChange = async (refModel, string) => {
   <el-input
     v-model="privateKeyPassword"
     type="password"
-    placeholder="如有需要，输入私钥密码，本站不支持密码单独解析。设置后请单独牢记"
+    placeholder="如有需要,输入私钥密码,额外加密"
     show-password
     clearable
     autocomplete
@@ -655,14 +776,13 @@ const dowloadChange = async (refModel, string) => {
     <n-tooltip trigger="hover">
       <template #trigger>
         <el-button
-          :disabled="qrCodeMake"
           color="#626aef"
           size="default"
           v-show="remakeFlag && !canRestart"
           @click="qrcodeShow = true"
           class="codeMaking-el-button-style"
         >
-          查看密钥二维码<el-icon
+          生成密钥二维码<el-icon
             size="16px"
             color="#fff"
             style="margin-left: 8px; vertical-align: text-bottom"
@@ -670,7 +790,7 @@ const dowloadChange = async (refModel, string) => {
           /></el-icon>
         </el-button>
       </template>
-      {{ qrCodeMakeTemplete }}
+      APP扫码快传密钥!
     </n-tooltip>
   </div>
 
@@ -760,82 +880,85 @@ const dowloadChange = async (refModel, string) => {
   <!-- ///////////////////////////////////////////////////////////////////////////////////////// -->
   <n-modal v-model:show="qrcodeShow">
     <n-card
-      style="width: 75%"
+      style="width: 55%"
       title="密钥 二维码"
       :bordered="false"
       size="huge"
       role="dialog"
       aria-modal="true"
     >
-      <p>
-        <span style="font-style: italic"
-          >团队分发密钥，复制黏贴传递太累？电脑生成密钥，复制到手机太麻烦？一键扫码立得密钥!</span
-        ><br /><br />
-        <strong>移动端扫码方法:</strong><br /><br />
-        1.<strong>微信</strong>：打开手机微信，点击扫一扫，扫码识别，全选复制源码。<span
-          style="color: red"
-          >(若结果提示文字无法显示请尝试浏览器扫码，QQ扫码无效)</span
-        ><br /><br />
-        2.<strong>浏览器</strong>(推荐):以<strong>百度</strong>为例，打开百度浏览器，点击首页输入框旁
-        <el-icon size="16px" color="#aaa" style="vertical-align: text-bottom"
-          ><CameraFilled /></el-icon
-        >&nbsp;图标，选择扫码。扫描即可提取并复制密钥源码，方便快捷。<br /><span
-          style="color: red"
-          >(注意有些浏览器可能不支持扫码获取文字！推荐使用百度浏览器或手机内置浏览器)</span
-        >
-      </p>
-      <p style="color: #626aef">
-        以下是这次密钥对应的二维码。打开手机扫码直接获取公私钥源码，更加便捷！<span
-          style="font-style: italic"
-          >(滑动下拉，底部可调节二维码尺寸~)</span
-        >
-      </p>
-      <div class="PublicKeyQrcode">
-        <h3 style="display: inline-block">公钥二维码：</h3>
-        <a-button
-          type="primary"
-          @click="dowloadChange(PublicQrcodeCanvasRef, '公钥')"
-          style="margin-top: 15px"
-          >下载公钥二维码</a-button
-        >
-        <a-qrcode
-          ref="PublicQrcodeCanvasRef"
-          :value="publicInitKeyCopy"
-          :size="qrCodeSize"
-          status="active"
-        />
-      </div>
-      <div class="PrivateKeyQrcode">
-        <h3 style="display: inline-block">私钥二维码：</h3>
-        <a-button
-          type="primary"
-          @click="dowloadChange(PrivateQrcodeCanvasRef, '私钥')"
-          style="margin-top: 15px"
-          >下载私钥二维码</a-button
-        >
-        <a-qrcode
-          ref="PrivateQrcodeCanvasRef"
-          :value="privateInitKeyCopy"
-          :size="qrCodeSize"
-          status="active"
-        />
-      </div>
-      <div>
-        <span>输入数值可调整二维码尺寸:</span>
-        <n-input-number
-          v-model:value="qrCodeSize"
-          size="medium"
-          style="width: 20%"
-          placeholder="建议尺寸  300~450"
-          min="200"
-          max="600"
-        />
-      </div>
-      <template #footer
-        ><span style="color: #aaa"
-          >2048位及以上强度的密钥源码过长,无法生成对应二维码,敬请谅解!</span
-        ></template
+      <strong>请选择二维码携带的数据:</strong><br /><br />
+      <el-checkbox
+        v-model="qrCodeOptions.publicKey"
+        label="携带公钥"
+        size="large"
+        border
+      />
+      <el-checkbox
+        v-model="qrCodeOptions.privateKey"
+        label="携带私钥"
+        size="large"
+        border
+      />
+      <el-checkbox
+        v-model="qrCodeOptions.password"
+        label="携带额外密码"
+        size="large"
+        border
+      />
+      <br />
+      <span
+        style="color: red; margin: 8px 0 0; display: inline-block; height: 20px"
+        >*注意：请按需选择指定部分数据进行快传，避免密钥数据泄露。</span
       >
+      <br /><br />
+      <n-button type="info" ghost @click="getQrCode">
+        生成/刷新 快传二维码
+      </n-button>
+      <br /><br />
+      <div class="qrCode-content" v-if="showQrCodeContent === 1">
+        <p>
+          <strong>移动端扫码步骤:</strong><br /><br />
+          1.打开&nbsp;<strong>KMCoding&nbsp;APP</strong>
+          点击首页“<strong>生成密钥</strong>”模块<br /><br />
+          2.点击 "<strong>扫码快捷导入密钥</strong>" 按钮，扫码快传!
+          <span
+            style="
+              color: red;
+              margin: 8px 0 0;
+              display: inline-block;
+              height: 20px;
+            "
+            >*提示：当前二维码云端存储5分钟，任何更新二维码的操作或重新生成密钥二维码，都会导致上一次二维码失效，只保留最后一次记录。即用即取！</span
+          >
+        </p>
+        <h3 style="display: inline-block">快传二维码：</h3>
+        <a-button
+          type="primary"
+          @click="dowloadChange(qrcodeCanvasRef, '快传')"
+          style="margin-top: 15px"
+          >下载二维码.png</a-button
+        >
+        <a-qrcode
+          ref="qrcodeCanvasRef"
+          :value="qrCodeValue"
+          icon="https://innerpurity-bucket.oss-cn-hangzhou.aliyuncs.com/58x58.png"
+          iconSize="47"
+          :size="qrCodeSize"
+          :status="qrCodeStatus"
+        />
+        <div>
+          <span>输入数值可调整二维码尺寸:</span>
+          <n-input-number
+            v-model:value="qrCodeSize"
+            size="medium"
+            style="width: 20%"
+            placeholder="建议尺寸: 250"
+            min="150"
+            max="450"
+          />
+        </div>
+      </div>
     </n-card>
   </n-modal>
   <!-- ///////////////////////////////////////////////////////////////////////////////////////// -->
@@ -1025,12 +1148,10 @@ const dowloadChange = async (refModel, string) => {
   background-color: #626aef;
 }
 
-.PublicKeyQrcode {
-  margin: 20px;
-  display: inline-block;
+.qrcode-content {
+  width: 100%;
 }
-.PrivateKeyQrcode {
-  margin: 20px;
-  display: inline-block;
+.skeleton-content {
+  width: 100%;
 }
 </style>

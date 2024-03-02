@@ -1,13 +1,15 @@
 <script setup>
 import { computed, ref } from "vue";
 import axios from "axios";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElNotification } from "element-plus";
 import { NCard, NModal, NTooltip, NInputNumber } from "naive-ui";
 import { useRsaHistoryStore } from "../../stores/rsaHistory";
 import { useTipsVisibleStore } from "../../stores/tipsVisible";
 import { useIsTypecodingStore } from "../../stores/isTypeCoding";
+import { useRsaUserInfoStore } from "../../stores/rsaUserInfo";
 import handelScroll from "../../hooks/handleScroll";
 const rsaHistoryStore = useRsaHistoryStore();
+const rsaUserInfoStore = useRsaUserInfoStore();
 /////////////////////////////////////////////////////////////////////////////////////
 const useTipsVisible = useTipsVisibleStore();
 const useIsTypecoding = useIsTypecodingStore();
@@ -29,6 +31,8 @@ const cryptionForm = ref({
   cryptionNews: "",
   publicKey: "",
   privateKey: "",
+  privateKeyPassword: "",
+  privateKeyPasswordNext: "",
 });
 /////////////////////////////////////////////////////////////////////////////////////
 const reCryptionShow = ref(false);
@@ -41,6 +45,8 @@ const reCryptionHandle = () => {
   cryptionForm.value.cryptionNews = "";
   cryptionForm.value.publicKey = "";
   cryptionForm.value.privateKey = "";
+  cryptionForm.value.privateKeyPassword = "";
+  cryptionForm.value.privateKeyPasswordNext = "";
   resendEnCryptionTypeOn.value = "";
   resendDeCryptionTypeOn.value = "";
   cryptionPercentage.value = 0;
@@ -105,6 +111,11 @@ const handleCryption = () => {
           params: {
             param1: cryptionForm.value.protoNews,
             param2: cryptionForm.value.publicKey,
+            opt: `${
+              cryptionForm.value.privateKeyPassword === ""
+                ? 0
+                : cryptionForm.value.privateKeyPassword
+            }`,
           },
         })
         .then((response) => {
@@ -145,6 +156,11 @@ const handleCryption = () => {
           params: {
             param1: cryptionForm.value.cryptionNews,
             param2: cryptionForm.value.privateKey,
+            opt: `${
+              cryptionForm.value.privateKeyPasswordNext === ""
+                ? 0
+                : cryptionForm.value.privateKeyPasswordNext
+            }`,
           },
         })
         .then((response) => {
@@ -326,7 +342,7 @@ const downloadCryptionHandle = () => {
       "\n",
       `***${dateToStr()} RSA-mkCoding 网 生成***`,
       "\n\n",
-      "相关贡献者(GitHub用户名)：前端页面,框架--inner-purity   后端算法--brokenstring314",
+      "相关贡献者(GitHub用户名)：inner-purity, brokenstring314",
     ],
     { type: "text/plain" }
   );
@@ -428,6 +444,17 @@ const dowloadChange = async (refModel, string) => {
   downLoadSuccessMessage();
 };
 /////////////////////////////////////////////////////////////////////////////////////
+const checkHistoryData = () => {
+  if (rsaUserInfoStore.userLoginInfo.id != null) {
+    rsaHistoryStore.drawerShow = true;
+  } else {
+    ElNotification.info({
+      title: "登录获取储存权限",
+      message: "为保证用户数据安全，存储功能登录后才能使用",
+      offset: 50,
+    });
+  }
+};
 </script>
 
 <template>
@@ -458,6 +485,7 @@ const dowloadChange = async (refModel, string) => {
         placeholder="输入要加密的字段"
         v-model="cryptionForm.protoNews"
         @input="handleInput($event, 'protoNews')"
+        maxlength="510"
       />
       <!--  -->
       <label for="uploadBtn1">{{ txtOnloadeButtonText_1 }}</label>
@@ -491,15 +519,27 @@ const dowloadChange = async (refModel, string) => {
       />
       <!--  -->
     </el-form-item>
+
+    <el-form-item label="额外密码" v-show="cryptionTypeShow === '加密'">
+      <el-input
+        v-model="cryptionForm.privateKeyPassword"
+        type="password"
+        placeholder="如果当初额外设置了密码，则输入，否则不必填写"
+        show-password
+        clearable
+        autocomplete
+        class="codeMaking-el-input-style"
+      />
+    </el-form-item>
     <el-form-item>
       <el-button
         class="cryption-form-edit-button"
         color="#41a057"
         type="primary"
         v-show="cryptionTypeShow === '加密'"
-        @click="rsaHistoryStore.drawerShow = true"
+        @click="checkHistoryData"
       >
-        查看本地公钥
+        查看账户公钥/密码
       </el-button>
 
       <el-button
@@ -553,15 +593,26 @@ const dowloadChange = async (refModel, string) => {
       />
       <!--  -->
     </el-form-item>
+    <el-form-item label="额外密码" v-show="cryptionTypeShow === '解密'">
+      <el-input
+        v-model="cryptionForm.privateKeyPasswordNext"
+        type="password"
+        placeholder="如果当初额外设置了密码，则输入，否则不必填写"
+        show-password
+        clearable
+        autocomplete
+        class="codeMaking-el-input-style"
+      />
+    </el-form-item>
     <el-form-item>
       <el-button
         class="cryption-form-edit-button"
         color="#41a057"
         type="primary"
         v-show="cryptionTypeShow === '解密'"
-        @click="rsaHistoryStore.drawerShow = true"
+        @click="checkHistoryData"
       >
-        查看本地私钥
+        查看账户私钥/密码
       </el-button>
     </el-form-item>
     <el-form-item>

@@ -29,14 +29,14 @@ const router = useRouter();
           <template #title>
             <span>功能使用指南</span>
           </template>
-          <el-menu-item-group title="网站基础功能">
+          <el-menu-item-group>
             <el-menu-item
               index="3-1"
               @click="router.push({ name: 'commonFunction' })"
               >功能使用介绍</el-menu-item
             >
           </el-menu-item-group>
-          <el-menu-item-group title="注意事项">
+          <el-menu-item-group>
             <el-menu-item
               index="3-4"
               @click="router.push({ name: 'commonAlert' })"
@@ -48,14 +48,14 @@ const router = useRouter();
           <template #title>
             <span>成为用户&登录/注册</span>
           </template>
-          <el-menu-item-group title="登陆注册">
+          <el-menu-item-group>
             <el-menu-item
               index="4-1"
               @click="router.push({ name: 'userLogin' })"
               >登录/注册</el-menu-item
             >
           </el-menu-item-group>
-          <el-menu-item-group title="用户功能">
+          <el-menu-item-group>
             <el-menu-item
               index="4-2"
               @click="router.push({ name: 'userFunction' })"
